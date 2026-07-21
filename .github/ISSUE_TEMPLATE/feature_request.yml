@@ -1,0 +1,24 @@
+name: Feature request
+description: Propose a focused improvement to the gel-analysis workflow
+title: "[Feature] "
+labels: [enhancement]
+body:
+  - type: textarea
+    id: need
+    attributes:
+      label: Scientific or workflow need
+      description: Describe the concrete analysis problem this feature should solve.
+    validations:
+      required: true
+  - type: textarea
+    id: behavior
+    attributes:
+      label: Proposed behavior
+      description: Describe the smallest useful interaction or output.
+    validations:
+      required: true
+  - type: textarea
+    id: assumptions
+    attributes:
+      label: Scientific assumptions or references
+      description: Include manufacturer documentation, methods references, or known failure modes where applicable.

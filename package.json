@@ -1,0 +1,14 @@
+{
+  "name": "gel-profile-studio",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Local-first agarose gel lane densitometry with intensity profiles, DNA ladder calibration, and reproducible export.",
+  "scripts": {
+    "test": "node scripts/validate.mjs",
+    "validate": "node scripts/validate.mjs"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "license": "MIT"
+}

@@ -1,0 +1,21 @@
+cff-version: 1.2.0
+message: "If you use Gel Profile Studio in your research workflow, please cite the software repository."
+title: "Gel Profile Studio"
+type: software
+authors:
+  - family-names: "Broketa"
+    given-names: "Matteo"
+    orcid: "https://orcid.org/0000-0001-7825-1174"
+repository-code: "https://github.com/matteobroketa/Gel-Profile-Studio"
+url: "https://matteobroketa.github.io/Gel-Profile-Studio/"
+license: MIT
+version: "1.0.0"
+date-released: "2026-07-21"
+abstract: "A local-first browser application for agarose gel lane densitometry, intensity profiling, background correction, DNA ladder calibration, and reproducible report export."
+keywords:
+  - agarose gel electrophoresis
+  - densitometry
+  - molecular biology
+  - DNA ladder
+  - image analysis
+  - reproducible research

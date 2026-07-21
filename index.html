@@ -1,0 +1,520 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="color-scheme" content="dark light" />
+<meta name="theme-color" content="#0d1117" />
+<meta name="description" content="Local-first agarose gel lane densitometry: draw lane ROIs, generate intensity profiles, calibrate against DNA ladders, and export reproducible reports." />
+<meta name="author" content="Matteo Broketa" />
+<meta name="application-name" content="Gel Profile Studio" />
+<meta name="robots" content="index,follow" />
+<link rel="canonical" href="https://matteobroketa.github.io/Gel-Profile-Studio/" />
+<link rel="icon" href="./favicon.svg" type="image/svg+xml" />
+<link rel="manifest" href="./site.webmanifest" />
+<meta property="og:type" content="website" />
+<meta property="og:title" content="Gel Profile Studio" />
+<meta property="og:description" content="Browser-based agarose gel densitometry with lane profiles, background correction, ladder calibration, and export." />
+<meta property="og:url" content="https://matteobroketa.github.io/Gel-Profile-Studio/" />
+<meta property="og:image" content="https://matteobroketa.github.io/Gel-Profile-Studio/assets/gel-profile-studio-preview.png" />
+<meta name="twitter:card" content="summary_large_image" />
+<title>Gel Profile Studio — agarose gel lane densitometry</title>
+<style>
+  :root{
+    --bg:#0d1117; --panel:#161b22; --panel2:#0d1117; --border:#30363d; --border2:#21262d;
+    --text:#f0f6fc; --muted:#8b949e; --subtle:#6e7681; --blue:#58a6ff; --blue2:#1f6feb;
+    --green:#3fb950; --red:#f85149; --orange:#d29922; --purple:#a371f7; --shadow:0 8px 24px rgba(1,4,9,.28);
+    --radius:6px;
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%}
+  body{margin:0;background:var(--bg);color:var(--text);font:14px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif}
+  button,input,select,textarea{font:inherit}
+  button{cursor:pointer}
+  a{color:var(--blue);text-decoration:none} a:hover{text-decoration:underline}
+  .app{min-height:100%;display:flex;flex-direction:column}
+  header{height:56px;border-bottom:1px solid var(--border);background:var(--panel);display:flex;align-items:center;gap:14px;padding:0 18px;position:sticky;top:0;z-index:20}
+  .mark{width:30px;height:30px;border:1px solid var(--border);border-radius:7px;display:grid;place-items:center;background:#0d1117}
+  .mark svg{width:20px;height:20px}
+  .brand{display:flex;align-items:baseline;gap:8px;min-width:245px}.brand strong{font-size:16px}.brand span{color:var(--muted);font-size:12px}
+  .header-actions{margin-left:auto;display:flex;gap:8px;align-items:center}
+  .btn,.icon-btn{border:1px solid var(--border);background:#21262d;color:var(--text);border-radius:6px;font-weight:600;box-shadow:0 0 transparent;padding:6px 11px;min-height:32px}
+  .btn:hover,.icon-btn:hover{background:#30363d;border-color:#8b949e}.btn.primary{background:#238636;border-color:rgba(240,246,252,.1)}.btn.primary:hover{background:#2ea043}
+  .btn.danger{color:#ff7b72}.btn.small{padding:4px 8px;min-height:28px;font-size:12px}.btn.ghost{background:transparent}
+  .icon-btn{width:32px;padding:0;display:grid;place-items:center}
+  .main{display:grid;grid-template-columns:minmax(430px,1.25fr) minmax(390px,.75fr);gap:0;flex:1;min-height:0}
+  .workspace{padding:16px;border-right:1px solid var(--border);min-width:0;display:flex;flex-direction:column;gap:12px}
+  .profiles{padding:16px;min-width:0;overflow:auto;max-height:calc(100vh - 56px)}
+  .toolbar{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+  .toolbar .sep{width:1px;height:24px;background:var(--border);margin:0 2px}
+  .seg{display:inline-flex;border:1px solid var(--border);border-radius:6px;overflow:hidden;background:#0d1117}
+  .seg button{border:0;border-right:1px solid var(--border);background:transparent;color:var(--muted);padding:5px 9px;font-weight:600;min-height:30px}.seg button:last-child{border-right:0}.seg button.active{background:#1f6feb;color:#fff}.seg button:hover:not(.active){background:#21262d;color:var(--text)}
+  .field-inline{display:flex;align-items:center;gap:6px;color:var(--muted);font-size:12px}.field-inline input[type=range]{width:100px}
+  .stage{position:relative;flex:1;min-height:520px;border:1px solid var(--border);border-radius:var(--radius);background:#010409;overflow:hidden;display:grid;place-items:center;box-shadow:var(--shadow)}
+  .empty{max-width:560px;text-align:center;padding:48px 28px}.empty h1{font-size:28px;margin:0 0 8px}.empty p{color:var(--muted);margin:0 auto 22px}.drop{border:1px dashed var(--border);border-radius:10px;padding:28px;background:#0d1117;transition:.15s}.drop.drag{border-color:var(--blue);background:rgba(31,111,235,.08)}.drop strong{display:block;margin-bottom:4px}.drop small{color:var(--muted)}
+  #gelWrap{position:relative;display:none;max-width:100%;max-height:100%;user-select:none;touch-action:none}
+  #gelCanvas{display:block;max-width:100%;max-height:calc(100vh - 190px);object-fit:contain;background:#000;image-rendering:auto}
+  #overlayCanvas{position:absolute;inset:0;width:100%;height:100%;cursor:crosshair}
+  .statusbar{display:flex;gap:16px;align-items:center;color:var(--muted);font-size:12px;min-height:22px}.statusbar .push{margin-left:auto}.dot{width:7px;height:7px;border-radius:50%;display:inline-block;background:var(--green);margin-right:5px}.warn-dot{background:var(--orange)}
+  .panel-title{display:flex;align-items:center;gap:8px;margin-bottom:12px}.panel-title h2{font-size:18px;margin:0}.badge{font-size:11px;padding:1px 6px;border-radius:999px;border:1px solid var(--border);color:var(--muted);background:#0d1117}
+  .global-controls{border:1px solid var(--border);border-radius:var(--radius);background:var(--panel);padding:10px;margin-bottom:12px;display:grid;gap:10px}
+  .control-row{display:flex;gap:12px;flex-wrap:wrap;align-items:center}.control-row label{color:var(--muted);font-size:12px}.control-row select,.control-row input[type=number],.control-row input[type=text]{margin-left:6px}
+  input[type=text],input[type=number],select,textarea{background:#0d1117;color:var(--text);border:1px solid var(--border);border-radius:6px;padding:5px 8px;outline:none}input:focus,select:focus,textarea:focus{border-color:var(--blue);box-shadow:0 0 0 3px rgba(31,111,235,.22)}
+  input[type=range]{accent-color:var(--blue2)}
+  .profile-list{display:flex;flex-direction:column;gap:10px}
+  .profile-card{border:1px solid var(--border);border-radius:var(--radius);background:var(--panel);overflow:hidden}.profile-card.selected{border-color:var(--blue)}
+  .profile-head{display:flex;gap:8px;align-items:center;padding:9px 10px;border-bottom:1px solid var(--border2)}.profile-head .swatch{width:10px;height:10px;border-radius:50%;flex:0 0 auto}.profile-head input{min-width:0;flex:1;font-weight:600}.profile-meta{color:var(--muted);font-size:11px;white-space:nowrap}.profile-actions{display:flex;gap:4px}
+  .chart-wrap{height:190px;padding:8px 8px 2px;position:relative}.profile-canvas{width:100%;height:100%;display:block}.chart-empty{display:grid;place-items:center;height:100%;color:var(--muted)}
+  .card-foot{padding:7px 10px;border-top:1px solid var(--border2);display:flex;gap:10px;align-items:center;color:var(--muted);font-size:11px}.card-foot .push{margin-left:auto}.ladder-pill{color:#d2a8ff;border:1px solid rgba(163,113,247,.45);background:rgba(163,113,247,.08);padding:1px 6px;border-radius:999px}
+  .placeholder{border:1px dashed var(--border);border-radius:var(--radius);padding:34px 18px;text-align:center;color:var(--muted);background:rgba(22,27,34,.6)}
+  .modal-backdrop{position:fixed;inset:0;background:rgba(1,4,9,.72);z-index:50;display:none;align-items:center;justify-content:center;padding:18px}.modal-backdrop.show{display:flex}
+  .modal{width:min(760px,96vw);max-height:88vh;overflow:auto;border:1px solid var(--border);background:var(--panel);border-radius:8px;box-shadow:0 16px 48px rgba(1,4,9,.65)}.modal.large{width:min(980px,96vw)}
+  .modal-head{display:flex;align-items:center;padding:14px 16px;border-bottom:1px solid var(--border)}.modal-head h3{margin:0;font-size:16px}.modal-head button{margin-left:auto}.modal-body{padding:16px}.modal-foot{padding:12px 16px;border-top:1px solid var(--border);display:flex;justify-content:flex-end;gap:8px}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}.setting{display:grid;gap:5px}.setting label{font-size:12px;color:var(--muted)}.setting.full{grid-column:1/-1}.help h4{margin:20px 0 6px}.help p,.help li{color:#c9d1d9}.help code{background:#0d1117;border:1px solid var(--border2);padding:1px 4px;border-radius:4px}.help .note{border-left:3px solid var(--orange);padding:8px 12px;background:rgba(210,153,34,.08);color:#e3b341}.help ul{padding-left:20px}
+  .ladder-box{border:1px solid var(--border);border-radius:6px;padding:12px;background:#0d1117;margin-top:12px}.ladder-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:10px}.stat{border:1px solid var(--border2);background:var(--panel);border-radius:6px;padding:8px}.stat b{display:block;font-size:16px}.stat span{font-size:11px;color:var(--muted)}
+  .toast{position:fixed;right:18px;bottom:18px;background:#21262d;border:1px solid var(--border);border-radius:6px;padding:10px 12px;box-shadow:var(--shadow);z-index:80;display:none;max-width:360px}.toast.show{display:block}.toast.error{border-color:rgba(248,81,73,.6)}
+  .kbd{display:inline-block;border:1px solid var(--border);border-bottom-color:#484f58;background:#161b22;border-radius:4px;padding:0 5px;font:11px ui-monospace,SFMono-Regular,Consolas,monospace;color:#c9d1d9}
+  .sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+  @media (max-width:980px){.main{grid-template-columns:1fr}.workspace{border-right:0;border-bottom:1px solid var(--border)}.profiles{max-height:none}.stage{min-height:430px}.brand span{display:none}}
+  @media print{header,.toolbar,.global-controls,.statusbar{display:none!important}.main{display:block}.workspace{border:0}.profiles{max-height:none}.stage{box-shadow:none}.profile-card{break-inside:avoid}}
+</style>
+</head>
+<body>
+<div class="app">
+<header>
+  <div class="mark" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none"><path d="M5 4h14M7 8h10M8 12h8M9 16h6M10 20h4" stroke="#58a6ff" stroke-width="1.7" stroke-linecap="round"/><path d="M4 3v18M20 3v18" stroke="#8b949e" stroke-width="1.2"/></svg></div>
+  <div class="brand"><strong>Gel Profile Studio</strong><span>local-first agarose densitometry</span></div>
+  <div class="header-actions">
+    <button class="btn ghost" id="helpBtn">Help</button>
+    <button class="btn" id="projectBtn">Project ▾</button>
+    <button class="btn primary" id="exportBtn">Export report</button>
+  </div>
+</header>
+<div class="main">
+  <section class="workspace">
+    <div class="toolbar">
+      <button class="btn" id="openBtn">Open image</button><input id="fileInput" class="sr-only" type="file" accept="image/*,.tif,.tiff,.bmp,.avif,.webp" />
+      <div class="sep"></div>
+      <div class="seg" aria-label="line mode"><button id="laneMode" class="active">Lane</button><button id="ladderMode">Ladder</button></div>
+      <button class="btn" id="rotateBtn" title="Rotate image 90° clockwise">Rotate 90°</button>
+      <button class="btn" id="clearBtn">Clear lines</button>
+      <div class="sep"></div>
+      <label class="field-inline">Lane width <input id="laneWidth" type="range" min="1" max="41" step="2" value="9"><span id="laneWidthVal">9 px</span></label>
+    </div>
+
+    <div class="stage" id="stage">
+      <div class="empty" id="emptyState">
+        <h1>Profile an agarose gel in the browser</h1>
+        <p>Drop an image, then click each lane. Profiles are calculated locally from the original pixels; your image is not uploaded.</p>
+        <div class="drop" id="dropZone">
+          <strong>Drop a gel image here</strong>
+          <small>PNG, JPEG, WebP, GIF, BMP, AVIF where supported; TIFF uses an on-demand decoder.</small><br><br>
+          <button class="btn primary" id="chooseBtn">Choose image</button>
+        </div>
+      </div>
+      <div id="gelWrap"><canvas id="gelCanvas"></canvas><canvas id="overlayCanvas"></canvas></div>
+    </div>
+    <div class="statusbar">
+      <span id="imageStatus">No image loaded</span>
+      <span id="analysisStatus"></span>
+      <span class="push" id="cursorStatus"></span>
+    </div>
+  </section>
+
+  <aside class="profiles">
+    <div class="panel-title"><h2>Intensity profiles</h2><span class="badge" id="laneCount">0 lanes</span></div>
+    <div class="global-controls">
+      <div class="control-row">
+        <span style="color:var(--muted);font-size:12px">Normalize intensity</span>
+        <div class="seg" id="normSeg"><button data-norm="lane" class="active">Per lane</button><button data-norm="image">Whole image</button><button data-norm="raw">Raw 0–255</button></div>
+      </div>
+      <div class="control-row">
+        <label>Signal <select id="polarity"><option value="bright">Bright bands</option><option value="dark">Dark bands / inverted gel</option></select></label>
+        <label>Background <select id="backgroundMode"><option value="none" selected>None</option><option value="local">Local flanks</option><option value="baseline">Rolling baseline</option></select></label>
+        <label>Smoothing <select id="smooth"><option value="1">Off</option><option value="3">3 px</option><option value="5" selected>5 px</option><option value="9">9 px</option><option value="15">15 px</option></select></label>
+      </div>
+      <div class="control-row">
+        <label><input type="checkbox" id="showRaw" /> Overlay raw profile</label>
+        <label><input type="checkbox" id="autoSelect" checked /> Select newest lane</label>
+        <span id="calibrationBadge" class="badge">Uncalibrated: distance in px</span>
+      </div>
+    </div>
+    <div id="profileList" class="profile-list"><div class="placeholder" id="profilePlaceholder">Load an image and click a lane to generate a profile.</div></div>
+  </aside>
+</div>
+</div>
+
+<div class="modal-backdrop" id="ladderModal">
+  <div class="modal">
+    <div class="modal-head"><h3>Place ladder lane</h3><button class="icon-btn modal-close" aria-label="Close">×</button></div>
+    <div class="modal-body">
+      <div class="grid2">
+        <div class="setting"><label>Ladder preset</label><select id="ladderPreset"></select></div>
+        <div class="setting"><label>Peak sensitivity</label><select id="peakSensitivity"><option value="0.10">High — more peaks</option><option value="0.16" selected>Medium</option><option value="0.24">Low — strong peaks only</option></select></div>
+        <div class="setting full"><label>Custom sizes (bp), comma-separated; largest → smallest</label><textarea id="customSizes" rows="3" placeholder="10000, 8000, 6000, ..."></textarea></div>
+      </div>
+      <div class="ladder-box">
+        <strong>Calibration model</strong>
+        <div style="color:var(--muted);font-size:12px;margin-top:4px">After you click the ladder lane, the app detects intensity peaks and fits <code>log10(bp)</code> against migration distance. Automatic matching is order-based and should be reviewed; saturated, faint, curved, or missing ladder bands can reduce accuracy.</div>
+      </div>
+    </div>
+    <div class="modal-foot"><button class="btn modal-close">Cancel</button><button class="btn primary" id="armLadderBtn">Use preset & click ladder</button></div>
+  </div>
+</div>
+
+<div class="modal-backdrop" id="projectModal">
+  <div class="modal">
+    <div class="modal-head"><h3>Project</h3><button class="icon-btn modal-close">×</button></div>
+    <div class="modal-body">
+      <div class="grid2">
+        <div class="setting"><label>Experiment / report title</label><input id="projectTitle" type="text" placeholder="Agarose gel analysis" /></div>
+        <div class="setting"><label>Sample / gel ID</label><input id="gelId" type="text" placeholder="Gel 01" /></div>
+        <div class="setting full"><label>Notes</label><textarea id="projectNotes" rows="5" placeholder="Gel %, stain, voltage/run time, sample context, processing notes…"></textarea></div>
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:16px">
+        <button class="btn" id="saveJsonBtn">Save project JSON</button>
+        <button class="btn" id="loadJsonBtn">Load project JSON</button><input type="file" id="jsonInput" class="sr-only" accept="application/json,.json" />
+        <button class="btn" id="exportCsvBtn">Export profile CSV</button>
+        <button class="btn" id="annotatedPngBtn">Save annotated gel PNG</button>
+      </div>
+      <p style="color:var(--muted);font-size:12px;margin:14px 0 0">Project JSON stores lane positions, labels, settings and the source image as a data URL when practical. Very large images may make project files large.</p>
+    </div>
+    <div class="modal-foot"><button class="btn modal-close">Close</button></div>
+  </div>
+</div>
+
+<div class="modal-backdrop" id="helpModal">
+  <div class="modal large help">
+    <div class="modal-head"><h3>How to use & scientific notes</h3><button class="icon-btn modal-close" aria-label="Close">×</button></div>
+    <div class="modal-body">
+      <h4>Workflow</h4>
+      <ol>
+        <li>Open or drop a gel image. Rotate if the lanes are not vertical.</li>
+        <li>Click the center of each lane. A narrow vertical ROI is averaged across the selected lane width; drag a line to reposition it.</li>
+        <li>Name each lane in the profile panel. The label appears along the lane on the image.</li>
+        <li>Choose bright- or dark-band polarity, background correction and smoothing. Use the normalization toggle for per-lane comparison, whole-image comparison, or raw grayscale signal.</li>
+        <li>Optional: place a ladder lane, choose a known ladder, and review the detected peak count and calibration quality before interpreting sizes.</li>
+        <li>Export a standalone HTML report, CSV profile table, annotated PNG, or project JSON.</li>
+      </ol>
+      <h4>What the profile represents</h4>
+      <p>Each trace is the mean grayscale signal across a narrow lane-width strip at each vertical position. A strip is intentionally used instead of a single-pixel column because it is more robust to sensor noise, small lane curvature and pixel-level artifacts. Local-flank background correction estimates background from strips immediately outside the lane at the same migration position.</p>
+      <h4>Interpretation cautions</h4>
+      <div class="note">Densitometry is semi-quantitative unless acquisition is unsaturated and calibrated. Do not compare absolute band quantity across different gels or imaging settings without appropriate standards and a validated workflow.</div>
+      <ul>
+        <li>Check saturation: clipped bright bands lose quantitative information. This app flags strongly saturated lanes but cannot recover clipped signal.</li>
+        <li>Keep lane width consistent for comparisons. Background subtraction can materially change integrated intensity, especially on uneven gels.</li>
+        <li>DNA size calibration is approximately log-linear over useful migration ranges, not perfectly linear across every fragment size or gel condition. Review ladder matching before using calibrated sizes.</li>
+        <li>Band intensity depends on stain, imaging exposure, DNA conformation and local background. Treat intensity as relative unless the experiment includes an appropriate quantitative standard.</li>
+      </ul>
+      <h4>Design basis</h4>
+      <p>The interface follows the compact, dark, utility-first style used across Matteo Broketa’s browser tools and GitHub profile: system typography, bordered panels, restrained controls, local-first analysis and explicit export. The analysis workflow borrows established ideas from ImageJ/Fiji gel profiling: lane ROIs, one-dimensional density traces, background handling and peak-area interpretation. Recent tools such as GelGenie show the value of automating band segmentation; this v1 deliberately keeps the core analysis transparent and inspectable rather than hiding it behind a model.</p>
+      <h4>References used for v1</h4>
+      <ul>
+        <li><a href="https://imagej.net/nih-image/manual/tech.html" target="_blank" rel="noreferrer">ImageJ / NIH Image — analyzing electrophoretic gels</a></li>
+        <li><a href="https://imagej.net/ij/docs/guide/user-guide.pdf" target="_blank" rel="noreferrer">ImageJ User Guide — line profiles and gel analysis</a></li>
+        <li><a href="https://www.nature.com/articles/s41467-025-59189-0" target="_blank" rel="noreferrer">GelGenie, Nature Communications (2025)</a></li>
+        <li><a href="https://www.thermofisher.com/us/en/home/brands/thermo-scientific/molecular-biology/thermo-scientific-nucleic-acid-electrophoresis-purification/dna-electrophoresis-thermo-scientific/dna-ladders-thermo-scientific/generuler-dna-ladders.html" target="_blank" rel="noreferrer">Thermo Scientific GeneRuler ladder specifications</a></li>
+      </ul>
+      <p style="color:var(--muted);font-size:12px">For research use. This browser tool is not a validated diagnostic or regulated analytical system.</p>
+    </div>
+    <div class="modal-foot"><button class="btn modal-close">Close</button></div>
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+(() => {
+  'use strict';
+  const $ = s => document.querySelector(s);
+  const $$ = s => [...document.querySelectorAll(s)];
+  const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+  const state = {
+    image:null, imageName:'', imageData:null, imageDataUrl:'', width:0,height:0,
+    lanes:[], selectedId:null, mode:'lane', pendingLadder:null,
+    laneWidth:9, norm:'lane', polarity:'bright', background:'none', smooth:5, showRaw:false,
+    calibration:null, project:{title:'Agarose gel analysis',gelId:'',notes:''},
+    drag:null, palette:['#58a6ff','#3fb950','#d29922','#a371f7','#f778ba','#39c5cf','#ff7b72','#79c0ff','#56d364','#e3b341']
+  };
+  const ladderPresets = {
+    'thermo-1kb': {name:'Thermo Scientific GeneRuler 1 kb', sizes:[10000,8000,6000,5000,4000,3500,3000,2500,2000,1500,1000,750,500,250], ref:[6000,3000,1000]},
+    'thermo-1kb-plus': {name:'Thermo Scientific GeneRuler 1 kb Plus', sizes:[20000,10000,7000,5000,4000,3000,2000,1500,1000,700,500,400,300,200,75], ref:[5000,1500,500]},
+    'thermo-100bp': {name:'Thermo Scientific GeneRuler 100 bp', sizes:[1000,900,800,700,600,500,400,300,200,100], ref:[500]},
+    'thermo-mix': {name:'Thermo Scientific GeneRuler DNA Ladder Mix', sizes:[10000,8000,6000,5000,4000,3500,3000,2500,2000,1500,1200,1000,900,800,700,600,500,400,300,200,100], ref:[3000,1000,500]},
+    'custom': {name:'Custom ladder', sizes:[], ref:[]}
+  };
+  const gelCanvas=$('#gelCanvas'), overlay=$('#overlayCanvas'), gctx=gelCanvas.getContext('2d',{willReadFrequently:true}), octx=overlay.getContext('2d');
+
+  function toast(msg, error=false){const t=$('#toast');t.textContent=msg;t.className='toast show'+(error?' error':'');clearTimeout(toast._t);toast._t=setTimeout(()=>t.className='toast',3200)}
+  function openModal(id){$(id).classList.add('show')}
+  function closeModals(){ $$('.modal-backdrop').forEach(x=>x.classList.remove('show')); }
+  $$('.modal-close').forEach(b=>b.addEventListener('click',closeModals));
+  $$('.modal-backdrop').forEach(m=>m.addEventListener('click',e=>{if(e.target===m)closeModals()}));
+  document.addEventListener('keydown',e=>{
+    if(e.key==='Escape'){closeModals();state.pendingLadder=null;setMode('lane')}
+    if((e.key==='Delete'||e.key==='Backspace') && state.selectedId && !['INPUT','TEXTAREA','SELECT'].includes(document.activeElement.tagName)){ e.preventDefault(); deleteLane(state.selectedId); }
+  });
+
+  function setMode(mode){state.mode=mode;$('#laneMode').classList.toggle('active',mode==='lane');$('#ladderMode').classList.toggle('active',mode==='ladder');overlay.style.cursor=mode==='ladder'?'cell':'crosshair'}
+  $('#laneMode').onclick=()=>{state.pendingLadder=null;setMode('lane')};
+  $('#ladderMode').onclick=()=>openModal('#ladderModal');
+  $('#helpBtn').onclick=()=>openModal('#helpModal');
+  $('#projectBtn').onclick=()=>{syncProjectFields();openModal('#projectModal')};
+  $('#exportBtn').onclick=exportReport;
+  $('#openBtn').onclick=$('#chooseBtn').onclick=()=>$('#fileInput').click();
+  $('#fileInput').onchange=e=>{if(e.target.files[0])loadFile(e.target.files[0]);e.target.value=''};
+  $('#saveJsonBtn').onclick=saveProject;
+  $('#loadJsonBtn').onclick=()=>$('#jsonInput').click();
+  $('#jsonInput').onchange=e=>{if(e.target.files[0])loadProject(e.target.files[0]);e.target.value=''};
+  $('#exportCsvBtn').onclick=exportCsv;
+  $('#annotatedPngBtn').onclick=saveAnnotatedPng;
+
+  const presetSel=$('#ladderPreset');
+  Object.entries(ladderPresets).forEach(([k,v])=>{const o=document.createElement('option');o.value=k;o.textContent=v.name;presetSel.appendChild(o)});
+  presetSel.onchange=()=>{const p=ladderPresets[presetSel.value];$('#customSizes').value=p.sizes.join(', ');$('#customSizes').disabled=presetSel.value!=='custom'};
+  presetSel.value='thermo-1kb';presetSel.dispatchEvent(new Event('change'));
+  $('#armLadderBtn').onclick=()=>{
+    let sizes = presetSel.value==='custom' ? parseSizes($('#customSizes').value) : ladderPresets[presetSel.value].sizes.slice();
+    if(sizes.length<3){toast('A ladder needs at least 3 known fragment sizes.',true);return}
+    state.pendingLadder={key:presetSel.value,name:ladderPresets[presetSel.value]?.name||'Custom ladder',sizes,sensitivity:+$('#peakSensitivity').value};
+    closeModals();setMode('ladder');toast('Click the center of the ladder lane.');
+  };
+  function parseSizes(s){return s.split(/[\s,;]+/).map(Number).filter(v=>Number.isFinite(v)&&v>0).sort((a,b)=>b-a)}
+
+  $('#laneWidth').oninput=e=>{state.laneWidth=+e.target.value;$('#laneWidthVal').textContent=state.laneWidth+' px';recomputeAll()};
+  $('#polarity').onchange=e=>{state.polarity=e.target.value;recomputeAll()};
+  $('#backgroundMode').onchange=e=>{state.background=e.target.value;recomputeAll()};
+  $('#smooth').onchange=e=>{state.smooth=+e.target.value;recomputeAll()};
+  $('#showRaw').onchange=e=>{state.showRaw=e.target.checked;renderProfiles()};
+  $('#normSeg').addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;state.norm=b.dataset.norm;$$('#normSeg button').forEach(x=>x.classList.toggle('active',x===b));renderProfiles()});
+  $('#clearBtn').onclick=()=>{if(!state.lanes.length)return; if(confirm('Remove all lane lines and calibration?')){state.lanes=[];state.selectedId=null;state.calibration=null;renderAll()}};
+  $('#rotateBtn').onclick=rotateImage90;
+
+  ['projectTitle','gelId','projectNotes'].forEach(id=>$('#'+id).addEventListener('input',()=>{state.project.title=$('#projectTitle').value;state.project.gelId=$('#gelId').value;state.project.notes=$('#projectNotes').value}));
+  function syncProjectFields(){$('#projectTitle').value=state.project.title;$('#gelId').value=state.project.gelId;$('#projectNotes').value=state.project.notes}
+
+  const stage=$('#stage'),drop=$('#dropZone');
+  ['dragenter','dragover'].forEach(ev=>stage.addEventListener(ev,e=>{e.preventDefault();drop.classList.add('drag')}));
+  ['dragleave','drop'].forEach(ev=>stage.addEventListener(ev,e=>{e.preventDefault();drop.classList.remove('drag')}));
+  stage.addEventListener('drop',e=>{const f=[...e.dataTransfer.files].find(x=>x.type.startsWith('image/')||/\.(tif|tiff|bmp|avif|webp)$/i.test(x.name));if(f)loadFile(f);else toast('No supported image file found.',true)});
+  window.addEventListener('paste',e=>{const f=[...e.clipboardData.files].find(x=>x.type.startsWith('image/'));if(f)loadFile(f)});
+
+  async function loadFile(file){
+    try{
+      $('#analysisStatus').innerHTML='<span class="dot warn-dot"></span>Decoding image…';
+      let decoded;
+      if(/tiff?/i.test(file.type)||/\.tiff?$/i.test(file.name)) decoded=await decodeTiff(file); else decoded=await decodeNative(file);
+      state.imageName=file.name; state.imageDataUrl=await fileToDataUrl(file).catch(()=> '');
+      setDecodedImage(decoded);
+      toast(`Loaded ${file.name}`);
+    }catch(err){console.error(err);toast('Could not decode this image: '+(err.message||err),true);$('#analysisStatus').textContent=''}
+  }
+  function fileToDataUrl(file){return new Promise((res,rej)=>{const r=new FileReader();r.onload=()=>res(r.result);r.onerror=rej;r.readAsDataURL(file)})}
+  async function decodeNative(file){
+    if('createImageBitmap' in window){try{const bmp=await createImageBitmap(file);return {source:bmp,width:bmp.width,height:bmp.height}}catch(_){} }
+    const url=URL.createObjectURL(file);try{return await new Promise((res,rej)=>{const img=new Image();img.onload=()=>res({source:img,width:img.naturalWidth,height:img.naturalHeight});img.onerror=()=>rej(new Error('Browser does not support this image format'));img.src=url})}finally{setTimeout(()=>URL.revokeObjectURL(url),1000)}
+  }
+  async function decodeTiff(file){
+    if(!window.UTIF){await loadScript('https://cdn.jsdelivr.net/npm/utif@3.1.0/UTIF.min.js')}
+    if(!window.UTIF)throw new Error('TIFF decoder unavailable (internet connection may be required)');
+    const buf=await file.arrayBuffer();const ifds=UTIF.decode(buf);if(!ifds.length)throw new Error('No TIFF image found');UTIF.decodeImage(buf,ifds[0]);const rgba=UTIF.toRGBA8(ifds[0]);
+    const c=document.createElement('canvas');c.width=ifds[0].width;c.height=ifds[0].height;const ctx=c.getContext('2d');ctx.putImageData(new ImageData(new Uint8ClampedArray(rgba),c.width,c.height),0,0);return {source:c,width:c.width,height:c.height};
+  }
+  function loadScript(src){return new Promise((res,rej)=>{const s=document.createElement('script');s.src=src;s.onload=res;s.onerror=()=>rej(new Error('Failed to load decoder'));document.head.appendChild(s)})}
+
+  function setDecodedImage({source,width,height}){
+    const maxPixels=36_000_000; if(width*height>maxPixels){toast('Large image detected. Analysis may be slower in this browser.')}
+    gelCanvas.width=width;gelCanvas.height=height;overlay.width=width;overlay.height=height;gctx.clearRect(0,0,width,height);gctx.drawImage(source,0,0,width,height);
+    state.imageData=gctx.getImageData(0,0,width,height);state.width=width;state.height=height;state.image=source;state.lanes=[];state.selectedId=null;state.calibration=null;
+    $('#emptyState').style.display='none';$('#gelWrap').style.display='block';fitGel();updateImageStats();renderAll();
+  }
+  function fitGel(){
+    const maxW=stage.clientWidth-20,maxH=Math.max(300,stage.clientHeight-20);const s=Math.min(maxW/state.width,maxH/state.height,1);gelCanvas.style.width=(state.width*s)+'px';gelCanvas.style.height=(state.height*s)+'px';overlay.style.width=gelCanvas.style.width;overlay.style.height=gelCanvas.style.height;
+  }
+  window.addEventListener('resize',()=>{if(state.imageData){fitGel();renderOverlay()}});
+  function updateImageStats(){
+    if(!state.imageData)return;const {data}=state.imageData;let min=255,max=0,sum=0,satHi=0,satLo=0,n=data.length/4;for(let i=0;i<data.length;i+=4){const v=luma(data[i],data[i+1],data[i+2]);min=Math.min(min,v);max=Math.max(max,v);sum+=v;if(v>=254)satHi++;if(v<=1)satLo++}
+    state.imageStats={min,max,mean:sum/n,satHi:satHi/n,satLo:satLo/n};$('#imageStatus').textContent=`${state.imageName||'Image'} · ${state.width}×${state.height}px · range ${min.toFixed(0)}–${max.toFixed(0)}`;$('#analysisStatus').innerHTML='<span class="dot"></span>Local analysis ready';
+  }
+  function luma(r,g,b){return .2126*r+.7152*g+.0722*b}
+
+  overlay.addEventListener('pointerdown',e=>{
+    if(!state.imageData)return;const p=canvasPoint(e);const hit=hitLane(p.x);
+    if(hit){state.selectedId=hit.id;state.drag={id:hit.id,startX:p.x,origX:hit.x};overlay.setPointerCapture(e.pointerId);renderAll();return}
+    addLane(p.x,state.mode==='ladder');
+  });
+  overlay.addEventListener('pointermove',e=>{
+    if(!state.imageData)return;const p=canvasPoint(e);$('#cursorStatus').textContent=`x ${Math.round(p.x)}, y ${Math.round(p.y)}`;
+    if(state.drag){const lane=state.lanes.find(l=>l.id===state.drag.id);lane.x=clamp(p.x,0,state.width-1);computeLane(lane);renderAll()}
+  });
+  overlay.addEventListener('pointerup',e=>{if(state.drag){state.drag=null;try{overlay.releasePointerCapture(e.pointerId)}catch(_){}}});
+  overlay.addEventListener('pointerleave',()=>{$('#cursorStatus').textContent=''});
+  function canvasPoint(e){const r=overlay.getBoundingClientRect();return {x:(e.clientX-r.left)*state.width/r.width,y:(e.clientY-r.top)*state.height/r.height}}
+  function hitLane(x){const tol=Math.max(6,state.laneWidth/2+4);let best=null,d=Infinity;for(const l of state.lanes){const dd=Math.abs(l.x-x);if(dd<tol&&dd<d){best=l;d=dd}}return best}
+
+  function addLane(x,isLadder){
+    if(isLadder && !state.pendingLadder){openModal('#ladderModal');return}
+    const lane={id:crypto.randomUUID?.()||('l'+Date.now()+Math.random()),x:Math.round(x),name:isLadder?'Ladder':`Lane ${state.lanes.filter(l=>!l.isLadder).length+1}`,isLadder:!!isLadder,color:isLadder?'#a371f7':state.palette[state.lanes.length%state.palette.length],raw:[],processed:[],saturation:0,ladder:null};
+    if(isLadder)lane.ladder={...state.pendingLadder};
+    state.lanes.push(lane);computeLane(lane);if($('#autoSelect').checked || isLadder)state.selectedId=lane.id;
+    if(isLadder){calibrateFromLadder(lane);state.pendingLadder=null;setMode('lane')}
+    renderAll();
+  }
+  function deleteLane(id){const lane=state.lanes.find(l=>l.id===id);state.lanes=state.lanes.filter(l=>l.id!==id);if(lane?.isLadder&&state.calibration?.laneId===id)state.calibration=null;if(state.selectedId===id)state.selectedId=state.lanes.at(-1)?.id||null;renderAll()}
+
+  function computeLane(lane){
+    if(!state.imageData)return;const w=state.width,h=state.height,data=state.imageData.data,half=Math.floor(state.laneWidth/2);const x0=clamp(Math.round(lane.x)-half,0,w-1),x1=clamp(Math.round(lane.x)+half,0,w-1);const flankGap=Math.max(2,Math.ceil(state.laneWidth*.35)),flankW=Math.max(2,Math.floor(state.laneWidth*.65));
+    let raw=new Float32Array(h),proc=new Float32Array(h),sat=0,count=0;
+    for(let y=0;y<h;y++){
+      let s=0,n=0,fs=0,fn=0,hi=0,lo=0;
+      for(let x=x0;x<=x1;x++){const i=(y*w+x)*4;const v=luma(data[i],data[i+1],data[i+2]);s+=v;n++;if(v>=254)hi++;if(v<=1)lo++}
+      if(state.background==='local'){
+        for(let x=Math.max(0,x0-flankGap-flankW);x<Math.max(0,x0-flankGap);x++){const i=(y*w+x)*4;fs+=luma(data[i],data[i+1],data[i+2]);fn++}
+        for(let x=Math.min(w,x1+flankGap+1);x<Math.min(w,x1+flankGap+1+flankW);x++){const i=(y*w+x)*4;fs+=luma(data[i],data[i+1],data[i+2]);fn++}
+      }
+      const mean=s/n;raw[y]=state.polarity==='bright'?mean:255-mean;
+      let signal=raw[y];
+      if(state.background==='local'&&fn){const bg=fs/fn;const bgSig=state.polarity==='bright'?bg:255-bg;signal=Math.max(0,signal-bgSig)}
+      proc[y]=signal;sat+=state.polarity==='bright'?hi:lo;count+=n;
+    }
+    if(state.background==='baseline')proc=subtractRollingBaseline(raw,Math.max(21,Math.round(h/18)|1));
+    if(state.smooth>1)proc=movingAverage(proc,state.smooth);
+    lane.raw=Array.from(raw);lane.processed=Array.from(proc);lane.saturation=count?sat/count:0;
+    lane.max=Math.max(...lane.processed);lane.integrated=lane.processed.reduce((a,b)=>a+b,0);lane.peaks=detectPeaks(lane.processed,0.16);
+  }
+  function movingAverage(arr,k){const n=arr.length,o=new Float32Array(n),r=Math.floor(k/2);let sum=0;for(let i=0;i<n;i++){sum+=arr[i];if(i-r-1>=0)sum-=arr[i-r-1];const left=Math.max(0,i-r),right=Math.min(n-1,i+r);if(i+r<n){} let s=0;for(let j=left;j<=right;j++)s+=arr[j];o[i]=s/(right-left+1)}return o}
+  function subtractRollingBaseline(arr,win){const n=arr.length,o=new Float32Array(n),r=Math.floor(win/2);for(let i=0;i<n;i++){let vals=[];for(let j=Math.max(0,i-r);j<=Math.min(n-1,i+r);j+=Math.max(1,Math.floor(win/15)))vals.push(arr[j]);vals.sort((a,b)=>a-b);const q=vals[Math.floor(vals.length*.2)]||0;o[i]=Math.max(0,arr[i]-q)}return o}
+  function recomputeAll(){state.lanes.forEach(computeLane);if(state.calibration){const ladder=state.lanes.find(l=>l.id===state.calibration.laneId);if(ladder)calibrateFromLadder(ladder)}renderAll()}
+
+  function detectPeaks(arr,sensitivity=.16){
+    const n=arr.length;if(n<7)return[];
+    // Gel bands are spatially broader than single-pixel noise. Smooth on a scale tied to image height,
+    // then require both absolute height and local prominence before accepting a candidate peak.
+    let k=Math.max(5,Math.round(n/120));if(k%2===0)k++;
+    const sm=movingAverage(arr,k),max=Math.max(...sm),min=Math.min(...sm),range=max-min,thr=min+range*sensitivity,promThr=Math.max(1,range*.055);
+    let peaks=[];const look=Math.max(4,Math.round(n/80));
+    for(let i=2;i<n-2;i++){
+      const v=sm[i];if(v<thr||v<sm[i-1]||v<=sm[i+1])continue;
+      let lmin=v,rmin=v;for(let j=Math.max(0,i-look);j<i;j++)lmin=Math.min(lmin,sm[j]);for(let j=i+1;j<=Math.min(n-1,i+look);j++)rmin=Math.min(rmin,sm[j]);
+      const prominence=v-Math.max(lmin,rmin);if(prominence<promThr)continue;peaks.push({y:i,value:v,prominence});
+    }
+    const minDist=Math.max(6,Math.round(n/75));peaks.sort((a,b)=>(b.prominence+b.value*.15)-(a.prominence+a.value*.15));const kept=[];for(const p of peaks){if(kept.every(q=>Math.abs(q.y-p.y)>=minDist))kept.push(p)}return kept.sort((a,b)=>a.y-b.y);
+  }
+
+  function calibrateFromLadder(lane){
+    if(!lane.ladder)return;const sizes=lane.ladder.sizes.slice().sort((a,b)=>b-a);let peaks=detectPeaks(lane.processed,lane.ladder.sensitivity||.16);
+    if(peaks.length<3){state.calibration={laneId:lane.id,valid:false,reason:`Only ${peaks.length} peaks detected`,peaks};return}
+    const match=bestOrderedCalibration(peaks,sizes,state.height);
+    const requiredMatches=Math.min(8,Math.max(5,Math.ceil(sizes.length*0.5)));
+    const enoughCoverage=match && match.count>=requiredMatches;
+    const credibleFit=match && match.r2>=0.965;
+    state.calibration={laneId:lane.id,valid:!!(match&&enoughCoverage&&credibleFit),peaks, ...match,ladderName:lane.ladder.name,
+      reason:match?(!credibleFit?`Fit R² ${match.r2.toFixed(3)} is below 0.965` : !enoughCoverage?`Only ${match.count} peaks matched reliably`:''): 'No ordered log-linear match found'};
+  }
+  function bestOrderedCalibration(peaks,sizes,h){
+    // Robust v1: evaluate contiguous peak and ladder subsets, fit log10(bp)=a*y+b, and choose best R² with useful coverage.
+    const maxK=Math.min(peaks.length,sizes.length,18);let best=null;
+    for(let k=Math.max(3,Math.min(5,maxK));k<=maxK;k++){
+      // Candidate peak subsets: evenly downsample if too many, plus contiguous windows.
+      const peakSets=[];
+      if(peaks.length===k)peakSets.push(peaks);
+      else{
+        for(let s=0;s<=peaks.length-k;s++)peakSets.push(peaks.slice(s,s+k));
+        const even=[];for(let i=0;i<k;i++)even.push(peaks[Math.round(i*(peaks.length-1)/(k-1))]);peakSets.push(even);
+      }
+      for(const ps of peakSets){
+        for(let ss=0;ss<=sizes.length-k;ss++){
+          const sz=sizes.slice(ss,ss+k);const xs=ps.map(p=>p.y),ys=sz.map(v=>Math.log10(v));const fit=linReg(xs,ys);if(!(fit.a<0))continue;const span=(xs.at(-1)-xs[0])/h;const score=fit.r2 + Math.min(.08,span*.06) + Math.min(.06,k*.004);
+          if(!best||score>best.score)best={score,a:fit.a,b:fit.b,r2:fit.r2,matched:ps.map((p,i)=>({y:p.y,bp:sz[i],value:p.value})),count:k,detected:peaks.length,expected:sizes.length};
+        }
+      }
+    }
+    if(!best)return null;best.minBp=Math.min(...best.matched.map(x=>x.bp));best.maxBp=Math.max(...best.matched.map(x=>x.bp));return best;
+  }
+  function linReg(x,y){const n=x.length,mx=x.reduce((a,b)=>a+b,0)/n,my=y.reduce((a,b)=>a+b,0)/n;let sxx=0,sxy=0,syy=0;for(let i=0;i<n;i++){const dx=x[i]-mx,dy=y[i]-my;sxx+=dx*dx;sxy+=dx*dy;syy+=dy*dy}const a=sxy/sxx,b=my-a*mx;let ssr=0;for(let i=0;i<n;i++){const pred=a*x[i]+b;ssr+=(y[i]-pred)**2}return {a,b,r2:syy?1-ssr/syy:1}}
+  function yToBp(y){const c=state.calibration;return c?.valid?Math.pow(10,c.a*y+c.b):null}
+
+  function renderAll(){renderOverlay();renderProfiles();updateBadges()}
+  function updateBadges(){
+    $('#laneCount').textContent=`${state.lanes.length} ${state.lanes.length===1?'lane':'lanes'}`;
+    const c=state.calibration,b=$('#calibrationBadge');if(c?.valid){b.textContent=`Auto-calibrated · review · ${c.ladderName} · R² ${c.r2.toFixed(3)}`;b.style.borderColor='rgba(63,185,80,.5)';b.style.color='#56d364'}else if(c){b.textContent=`Ladder placed · ${c.reason||'calibration weak'}`;b.style.borderColor='rgba(210,153,34,.55)';b.style.color='#e3b341'}else{b.textContent='Uncalibrated: distance in px';b.style.borderColor='';b.style.color=''}
+  }
+  function renderOverlay(){
+    octx.clearRect(0,0,overlay.width,overlay.height);if(!state.imageData)return;const scale=state.width/(overlay.getBoundingClientRect().width||state.width);const lineW=Math.max(1.2,1.5*scale),font=Math.max(11,12*scale);
+    for(const lane of state.lanes){const x=lane.x,half=state.laneWidth/2;octx.save();octx.fillStyle=hexAlpha(lane.color,.11);octx.fillRect(x-half,0,state.laneWidth,state.height);octx.strokeStyle=lane.color;octx.lineWidth=lane.id===state.selectedId?lineW*2:lineW;octx.beginPath();octx.moveTo(x,0);octx.lineTo(x,state.height);octx.stroke();octx.fillStyle=lane.color;octx.beginPath();octx.arc(x,8*scale,4*scale,0,Math.PI*2);octx.fill();octx.translate(x+7*scale,Math.min(state.height-8,14*scale));octx.rotate(Math.PI/2);octx.font=`600 ${font}px -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif`;octx.textBaseline='top';octx.fillStyle='rgba(0,0,0,.65)';octx.fillText(lane.name,1*scale,1*scale);octx.fillStyle=lane.color;octx.fillText(lane.name,0,0);octx.restore();
+      if(lane.isLadder&&state.calibration?.matched){octx.save();octx.font=`${Math.max(9,10*scale)}px ui-monospace,monospace`;for(const m of state.calibration.matched){octx.strokeStyle=hexAlpha(lane.color,.85);octx.lineWidth=scale;octx.beginPath();octx.moveTo(x-state.laneWidth*.8,m.y);octx.lineTo(x+state.laneWidth*.8,m.y);octx.stroke();octx.fillStyle=lane.color;octx.fillText(formatBp(m.bp),x+state.laneWidth+4*scale,m.y-4*scale)}octx.restore()}
+    }
+  }
+  function hexAlpha(hex,a){if(!hex.startsWith('#'))return hex;const r=parseInt(hex.slice(1,3),16),g=parseInt(hex.slice(3,5),16),b=parseInt(hex.slice(5,7),16);return `rgba(${r},${g},${b},${a})`}
+  function formatBp(bp){return bp>=1000?(bp/1000).toFixed(bp%1000?1:0)+' kb':Math.round(bp)+' bp'}
+
+  function renderProfiles(){
+    const list=$('#profileList');list.innerHTML='';if(!state.lanes.length){list.innerHTML='<div class="placeholder">Load an image and click a lane to generate a profile.</div>';return}
+    state.lanes.forEach(lane=>{
+      const card=document.createElement('div');card.className='profile-card'+(lane.id===state.selectedId?' selected':'');card.dataset.id=lane.id;
+      const sat=lane.saturation>0.01?` · ${(lane.saturation*100).toFixed(1)}% clipped`:'';
+      card.innerHTML=`<div class="profile-head"><span class="swatch" style="background:${lane.color}"></span><input class="lane-name" value="${esc(lane.name)}" aria-label="Lane name"><span class="profile-meta">x ${Math.round(lane.x)}${sat}</span><div class="profile-actions"><button class="btn small ghost select-btn">Select</button><button class="btn small ghost delete-btn" title="Delete">×</button></div></div><div class="chart-wrap"><canvas class="profile-canvas"></canvas></div><div class="card-foot">${lane.isLadder?'<span class="ladder-pill">Ladder</span>':''}<span>Peak max ${formatIntensity(lane.max,lane)}</span><span>Area ${Math.round(lane.integrated).toLocaleString()}</span><span class="push">${lane.isLadder&&state.calibration?.laneId===lane.id&&state.calibration?.matched?`${state.calibration.matched.length} matched · R² ${state.calibration.r2.toFixed(3)}`:`${lane.peaks?.length||0} candidate peaks`}</span></div>`;
+      list.appendChild(card);const inp=card.querySelector('.lane-name');inp.addEventListener('input',()=>{lane.name=inp.value||'Untitled lane';renderOverlay()});card.querySelector('.select-btn').onclick=()=>{state.selectedId=lane.id;renderAll()};card.querySelector('.delete-btn').onclick=()=>deleteLane(lane.id);card.addEventListener('click',e=>{if(!e.target.closest('button,input')){state.selectedId=lane.id;renderAll()}});
+      requestAnimationFrame(()=>drawChart(card.querySelector('canvas'),lane));
+    })
+  }
+  function formatIntensity(v,lane){if(state.norm==='raw')return v.toFixed(1);return Math.round(normalizeVal(v,lane)*100)+'%'}
+  function normalizeVal(v,lane){if(state.norm==='raw')return v; if(state.norm==='lane')return lane.max? v/lane.max:0;const denom=state.polarity==='bright'?state.imageStats.max:(255-state.imageStats.min);return denom? v/denom:0}
+  function drawChart(canvas,lane){
+    const dpr=Math.max(1,Math.min(2,devicePixelRatio||1)),r=canvas.getBoundingClientRect();canvas.width=Math.max(10,Math.round(r.width*dpr));canvas.height=Math.max(10,Math.round(r.height*dpr));const ctx=canvas.getContext('2d');ctx.scale(dpr,dpr);const W=r.width,H=r.height,m={l:46,r:12,t:10,b:28},pw=W-m.l-m.r,ph=H-m.t-m.b;ctx.clearRect(0,0,W,H);
+    ctx.strokeStyle='#21262d';ctx.lineWidth=1;for(let i=0;i<=4;i++){const y=m.t+ph*i/4;ctx.beginPath();ctx.moveTo(m.l,y);ctx.lineTo(W-m.r,y);ctx.stroke()}
+    ctx.fillStyle='#8b949e';ctx.font='10px -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif';ctx.textAlign='right';ctx.textBaseline='middle';for(let i=0;i<=4;i++){const val=state.norm==='raw'?255*(1-i/4):100*(1-i/4);ctx.fillText(state.norm==='raw'?val.toFixed(0):val.toFixed(0)+'%',m.l-6,m.t+ph*i/4)}
+    const series=lane.processed,n=series.length;let ymax;if(state.norm==='raw')ymax=255;else ymax=1;
+    const toY=v=>m.t+ph-(state.norm==='raw'?clamp(v,0,255)/255:clamp(normalizeVal(v,lane),0,1))*ph;
+    const xForIndex=i=>m.l+pw*(i/(n-1||1));
+    if(state.showRaw){ctx.strokeStyle='rgba(139,148,158,.45)';ctx.lineWidth=1;ctx.beginPath();lane.raw.forEach((v,i)=>{const x=xForIndex(i),y=toY(v);i?ctx.lineTo(x,y):ctx.moveTo(x,y)});ctx.stroke()}
+    ctx.strokeStyle=lane.color;ctx.lineWidth=1.6;ctx.beginPath();series.forEach((v,i)=>{const x=xForIndex(i),y=toY(v);i?ctx.lineTo(x,y):ctx.moveTo(x,y)});ctx.stroke();
+    // x-axis ticks: calibrated bp when possible, otherwise pixels.
+    ctx.fillStyle='#8b949e';ctx.textAlign='center';ctx.textBaseline='top';for(let i=0;i<=4;i++){const idx=Math.round((n-1)*i/4),x=xForIndex(idx);ctx.strokeStyle='#30363d';ctx.beginPath();ctx.moveTo(x,m.t+ph);ctx.lineTo(x,m.t+ph+4);ctx.stroke();const bp=yToBp(idx);ctx.fillText(bp?compactBp(bp):String(idx),x,m.t+ph+6)}
+    ctx.save();ctx.translate(10,m.t+ph/2);ctx.rotate(-Math.PI/2);ctx.textAlign='center';ctx.textBaseline='top';ctx.fillStyle='#6e7681';ctx.fillText(state.norm==='raw'?'signal (0–255)':'relative intensity',0,0);ctx.restore();ctx.textAlign='center';ctx.fillStyle='#6e7681';ctx.fillText(state.calibration?.valid?'fragment size (log-calibrated bp)':'migration distance (px)',m.l+pw/2,H-11);
+    if(lane.isLadder&&state.calibration?.laneId===lane.id&&state.calibration.matched){ctx.fillStyle=hexAlpha(lane.color,.8);for(const p of state.calibration.matched){const x=xForIndex(p.y);ctx.fillRect(x-1,m.t,2,ph)}}
+  }
+  function compactBp(bp){if(bp>=1000)return (bp/1000).toPrecision(2)+'k';return Math.round(bp).toString()}
+  function esc(s){return String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]))}
+
+  async function rotateImage90(){
+    if(!state.imageData)return;const c=document.createElement('canvas');c.width=state.height;c.height=state.width;const ctx=c.getContext('2d');ctx.translate(c.width,0);ctx.rotate(Math.PI/2);ctx.drawImage(gelCanvas,0,0);const oldUrl=state.imageDataUrl;setDecodedImage({source:c,width:c.width,height:c.height});state.imageDataUrl=await canvasToDataUrl(c,'image/png');state.imageName=(state.imageName||'gel').replace(/(\.[^.]+)?$/,'_rotated.png');toast('Image rotated. Existing lanes were cleared.')
+  }
+  function canvasToDataUrl(c,type='image/png',quality=.95){return new Promise(res=>c.toBlob(b=>{const r=new FileReader();r.onload=()=>res(r.result);r.readAsDataURL(b)},type,quality))}
+
+  function download(name,blob){const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),1000)}
+  function safeBase(){return (state.project.gelId||state.imageName||'gel-profile').replace(/\.[^.]+$/,'').replace(/[^a-z0-9_-]+/gi,'_')}
+  function exportCsv(){
+    if(!state.lanes.length){toast('Add at least one lane first.',true);return}let rows=[['position_px','calibrated_bp',...state.lanes.map(l=>l.name)].join(',')];for(let y=0;y<state.height;y++){rows.push([y,state.calibration?.valid?yToBp(y).toFixed(2):'',...state.lanes.map(l=>l.processed[y]?.toFixed(4)??'')].map(csv).join(','))}download(safeBase()+'_profiles.csv',new Blob([rows.join('\n')],{type:'text/csv;charset=utf-8'}));
+  }
+  function csv(v){const s=String(v);return /[",\n]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s}
+  async function saveAnnotatedPng(){
+    if(!state.imageData){toast('Load an image first.',true);return}const c=document.createElement('canvas');c.width=state.width;c.height=state.height;const ctx=c.getContext('2d');ctx.drawImage(gelCanvas,0,0);ctx.drawImage(overlay,0,0);c.toBlob(b=>download(safeBase()+'_annotated.png',b),'image/png')
+  }
+  async function saveProject(){
+    if(!state.imageData){toast('Load an image before saving a project.',true);return}let img=state.imageDataUrl;if(!img||/^data:image\/(tiff?|x-tiff)/i.test(img)||img.length>40_000_000)img=await canvasToDataUrl(gelCanvas,'image/png');const payload={version:1,app:'Gel Profile Studio',savedAt:new Date().toISOString(),image:{name:state.imageName,dataUrl:img},lanes:state.lanes.map(l=>({id:l.id,x:l.x,name:l.name,isLadder:l.isLadder,color:l.color,ladder:l.ladder})),settings:{laneWidth:state.laneWidth,norm:state.norm,polarity:state.polarity,background:state.background,smooth:state.smooth,showRaw:state.showRaw},project:state.project};download(safeBase()+'_project.json',new Blob([JSON.stringify(payload,null,2)],{type:'application/json'}));
+  }
+  async function loadProject(file){
+    try{const p=JSON.parse(await file.text());if(!p.image?.dataUrl)throw new Error('Project image is missing');const img=new Image();await new Promise((res,rej)=>{img.onload=res;img.onerror=rej;img.src=p.image.dataUrl});state.imageName=p.image.name||'project-image';state.imageDataUrl=p.image.dataUrl;setDecodedImage({source:img,width:img.naturalWidth,height:img.naturalHeight});Object.assign(state,p.settings||{});$('#laneWidth').value=state.laneWidth;$('#laneWidthVal').textContent=state.laneWidth+' px';$('#polarity').value=state.polarity;$('#backgroundMode').value=state.background;$('#smooth').value=state.smooth;$('#showRaw').checked=!!state.showRaw;$$('#normSeg button').forEach(x=>x.classList.toggle('active',x.dataset.norm===state.norm));state.project=p.project||state.project;state.lanes=(p.lanes||[]).map(l=>({...l,raw:[],processed:[]}));state.lanes.forEach(computeLane);const ladder=state.lanes.find(l=>l.isLadder);if(ladder)calibrateFromLadder(ladder);state.selectedId=state.lanes[0]?.id||null;renderAll();closeModals();toast('Project loaded.')}catch(err){console.error(err);toast('Could not load project: '+(err.message||err),true)}
+  }
+
+  async function exportReport(){
+    if(!state.imageData||!state.lanes.length){toast('Load an image and add at least one lane first.',true);return}
+    const annotated=await annotatedDataUrl();const created=new Date().toLocaleString();const rows=state.lanes.map(l=>`<tr><td>${esc(l.name)}</td><td>${Math.round(l.x)}</td><td>${state.laneWidth}</td><td>${l.isLadder?'Yes':'No'}</td><td>${(l.saturation*100).toFixed(2)}%</td><td>${Math.round(l.integrated).toLocaleString()}</td><td>${l.peaks?.length||0}</td></tr>`).join('');
+    const charts=state.lanes.map(l=>`<section class="profile"><h3>${esc(l.name)}${l.isLadder?' <span class="pill">ladder</span>':''}</h3>${profileSvg(l)}</section>`).join('');
+    const peakSections=state.lanes.map(l=>{const peaks=(l.peaks||[]).slice().sort((a,b)=>b.prominence-a.prominence).slice(0,20).sort((a,b)=>a.y-b.y);const pr=peaks.map((p,i)=>`<tr><td>${i+1}</td><td>${p.y}</td><td>${state.calibration?.valid?formatBp(yToBp(p.y)):'—'}</td><td>${state.norm==='raw'?p.value.toFixed(1):(normalizeVal(p.value,l)*100).toFixed(1)+'%'}</td></tr>`).join('');return `<section class="profile"><h3>${esc(l.name)} — candidate peaks</h3><table><thead><tr><th>#</th><th>Migration (px)</th><th>Estimated size</th><th>Peak intensity</th></tr></thead><tbody>${pr||'<tr><td colspan="4">No candidate peaks detected.</td></tr>'}</tbody></table></section>`}).join('');
+    const cal=state.calibration?.valid?`<p><strong>Calibration:</strong> ${esc(state.calibration.ladderName)}; ${state.calibration.count} matched peaks; R² ${state.calibration.r2.toFixed(4)}; fitted log10(bp) = ${state.calibration.a.toExponential(5)} × y + ${state.calibration.b.toFixed(5)}.</p>`:`<p><strong>Calibration:</strong> none${state.calibration?' (ladder was placed but automatic fit was not reliable)':''}.</p>`;
+    const html=`<!doctype html><html><head><meta charset="utf-8"><title>${esc(state.project.title||'Gel profile report')}</title><style>body{font:14px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif;color:#1f2328;max-width:1150px;margin:36px auto;padding:0 28px}h1{margin-bottom:4px}h2{margin-top:32px;border-bottom:1px solid #d0d7de;padding-bottom:7px}h3{margin:0 0 8px}.meta{color:#656d76}.gel{max-width:100%;border:1px solid #d0d7de;border-radius:6px;background:#000}table{border-collapse:collapse;width:100%;font-size:12px}th,td{border:1px solid #d0d7de;padding:6px;text-align:left}th{background:#f6f8fa}.profiles{display:grid;grid-template-columns:1fr 1fr;gap:16px}.profile{border:1px solid #d0d7de;border-radius:6px;padding:12px;break-inside:avoid}.pill{font-size:11px;border:1px solid #8250df;color:#8250df;border-radius:999px;padding:1px 6px}.note{border-left:3px solid #bf8700;background:#fff8c5;padding:8px 12px}.footer{margin-top:32px;color:#656d76;font-size:11px}@media(max-width:800px){.profiles{grid-template-columns:1fr}}@media print{body{margin:0;max-width:none}.profile{break-inside:avoid}}</style></head><body><h1>${esc(state.project.title||'Gel profile report')}</h1><div class="meta">${esc(state.project.gelId||state.imageName)} · Generated ${esc(created)} · Gel Profile Studio v1</div>${state.project.notes?`<p>${esc(state.project.notes).replace(/\n/g,'<br>')}</p>`:''}<h2>Annotated gel</h2><img class="gel" src="${annotated}"><h2>Analysis settings</h2><p><strong>Source:</strong> ${esc(state.imageName)} (${state.width} × ${state.height} px). <strong>Lane width:</strong> ${state.laneWidth} px. <strong>Signal:</strong> ${esc(state.polarity)} bands. <strong>Background:</strong> ${esc(state.background)}. <strong>Smoothing:</strong> ${state.smooth}px. <strong>Normalization:</strong> ${esc(state.norm)}.</p>${cal}<div class="note">Interpretation note: gel densitometry is semi-quantitative unless acquisition is unsaturated and calibrated. Automatic ladder matching is an aid, not a substitute for reviewing the marker lane and experimental conditions.</div><h2>Lane summary</h2><table><thead><tr><th>Lane</th><th>x (px)</th><th>Width</th><th>Ladder</th><th>Clipped pixels</th><th>Integrated signal</th><th>Candidate peaks</th></tr></thead><tbody>${rows}</tbody></table><h2>Profiles</h2><div class="profiles">${charts}</div><h2>Candidate peak findings</h2><div class="profiles">${peakSections}</div><div class="footer">Profiles are mean grayscale signal across the lane ROI at each migration position, with the selected signal polarity, background correction and smoothing. Report generated locally in the browser.</div></body></html>`;
+    download(safeBase()+'_report.html',new Blob([html],{type:'text/html;charset=utf-8'}));toast('Report exported as standalone HTML. Open it and print to PDF if needed.')
+  }
+  async function annotatedDataUrl(){const c=document.createElement('canvas');c.width=state.width;c.height=state.height;const ctx=c.getContext('2d');ctx.drawImage(gelCanvas,0,0);ctx.drawImage(overlay,0,0);return c.toDataURL('image/png')}
+  function profileSvg(lane){
+    const W=560,H=230,m={l:48,r:12,t:12,b:34},pw=W-m.l-m.r,ph=H-m.t-m.b,n=lane.processed.length;const vals=lane.processed;const yv=v=>m.t+ph-(state.norm==='raw'?clamp(v,0,255)/255:clamp(normalizeVal(v,lane),0,1))*ph;let d='';for(let i=0;i<n;i++){const x=m.l+pw*i/(n-1||1),y=yv(vals[i]);d+=(i?'L':'M')+x.toFixed(2)+' '+y.toFixed(2)+' '};let grid='';for(let i=0;i<=4;i++){const y=m.t+ph*i/4;grid+=`<line x1="${m.l}" y1="${y}" x2="${W-m.r}" y2="${y}" stroke="#d8dee4" stroke-width="1"/><text x="${m.l-6}" y="${y+3}" text-anchor="end" font-size="10" fill="#656d76">${state.norm==='raw'?Math.round(255*(1-i/4)):Math.round(100*(1-i/4))+'%'}</text>`}let xt='';for(let i=0;i<=4;i++){const idx=Math.round((n-1)*i/4),x=m.l+pw*i/4,bp=yToBp(idx);xt+=`<text x="${x}" y="${H-12}" text-anchor="middle" font-size="10" fill="#656d76">${bp?compactBp(bp):idx}</text>`}return `<svg viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="Intensity profile for ${esc(lane.name)}">${grid}<path d="${d}" fill="none" stroke="${lane.color}" stroke-width="1.8"/>${xt}<text x="${W/2}" y="${H-1}" text-anchor="middle" font-size="10" fill="#656d76">${state.calibration?.valid?'fragment size (bp)':'migration distance (px)'}</text></svg>`
+  }
+
+  function hexToRgb(hex){const m=/^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);return m?{r:parseInt(m[1],16),g:parseInt(m[2],16),b:parseInt(m[3],16)}:null}
+
+  fitGel();
+})();
+</script>
+</body>
+</html>
