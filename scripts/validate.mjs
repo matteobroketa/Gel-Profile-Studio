@@ -24,6 +24,8 @@ for (const needle of [
   'https://matteobroketa.github.io/Gel-Profile-Studio/',
   'id="gelCanvas"',
   'id="overlayCanvas"',
+  'id="adjustAreaBtn"',
+  'gelBounds',
   'id="profileList"',
   'id="ladderMode"',
   'id="exportBtn"',

@@ -14,6 +14,10 @@ v1 assumes approximately vertical lanes and samples a constant-width vertical RO
 
 Local-flank and rolling-baseline correction are heuristic. Nearby bright material, neighboring lanes, uneven illumination, dust, saturated regions, or strong gel gradients can bias background estimates.
 
+## Gel analysis area
+
+The analysis rectangle can exclude non-gel borders and labels, improving normalization and background estimates, but its selection is a user judgment. It cannot correct a biologically inappropriate ROI, curved lanes, or uneven illumination within the selected area.
+
 ## Peak detection
 
 Candidate peaks may merge unresolved bands, split noisy bands, or miss faint bands. Peak count should not be treated as an authoritative band count without image review.

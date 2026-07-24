@@ -8,6 +8,7 @@ Live app: https://matteobroketa.github.io/Gel-Profile-Studio/
 
 ## Core capabilities
 
+- **Adjustable gel analysis area** — define a non-destructive gel ROI so scanner borders, labels, and empty margins are excluded from quantitative calculations.
 - **Fast lane profiling** — click a lane to create a vertical ROI; drag to reposition and adjust lane width globally.
 - **Intensity profiles** — per-lane, whole-image, or raw 0–255 normalization with bright- or dark-band polarity.
 - **Noise handling** — optional smoothing plus local-flank or rolling-baseline background correction.

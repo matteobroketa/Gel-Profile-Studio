@@ -6,6 +6,10 @@ Gel Profile Studio analyzes the decoded pixel raster at its native dimensions. B
 
 The displayed gel may be scaled for the viewport, but lane coordinates and calculations are mapped to native image pixels.
 
+## Gel analysis area
+
+The adjustable gel analysis rectangle is stored in native image pixels and defaults to the full decoded image. Pixels outside this non-destructive ROI remain visible but are excluded from image intensity statistics, whole-image normalization, lane migration sampling, local-flank background sampling, saturation estimates, and ladder peak/calibration processing. Lane migration coordinates begin at the ROI top edge. Users remain responsible for selecting a biologically appropriate gel field.
+
 ## Lane sampling
 
 A lane is represented by a vertical centerline and a user-selected odd-numbered ROI width. For each image row, grayscale intensity is averaged across the ROI width. This produces a one-dimensional migration profile while reducing sensitivity to single-pixel noise and small horizontal band irregularities.
